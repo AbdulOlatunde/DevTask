@@ -29,7 +29,7 @@ app.get('/admin/tasks', async (req, res) => {
 });
 
 // Use the dynamic port 
-const PORT = process.env.PORT || 7000;
+const PORT = process.env.PORT || 6999;
 const MONGO_URI = process.env.MONGO_URI;
 
 // Initialize server
