@@ -11,7 +11,7 @@ const app = express();
 app.use(bodyParser.json());
 
 // Health check
-app.get('/', (req, res) => res.send('DevTask agent is alive and healthy 🚀'));
+app.get('/', (req, res) => res.send('DevTask agent is alive and healthy '));
 
 // Webhook endpoint Telex will call
 app.post('/telex/webhook', handleIncomingTelex);
