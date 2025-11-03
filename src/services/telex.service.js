@@ -2,7 +2,7 @@ import axios from 'axios';
 
 const TELEX_WEBHOOK_URL = process.env.TELEX_WEBHOOK_URL || '';
 
-/**
+/*
  * sendToTelex(user, text)
  * Sends a message back to Telex using the configured webhook.
  * If TELEX_WEBHOOK_URL is missing, it logs the message for local testing.

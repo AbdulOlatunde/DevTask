@@ -14,7 +14,7 @@ export const extractTask = (text) => {
   const original = text.trim();
   const lower = original.toLowerCase();
 
-  // Heuristics: look for common task triggers
+  // Heuristics to look for common task triggers
   const triggerRegex = /\b(remind me to|i'll|i will|i'm going to|i am going to|please (?:remind )?me to|i'll try to|i'll try)\b/i;
   const verbRegex = /\b(finish|fix|complete|deploy|release|implement|update|write|review|build|investigate|test)\b/i;
 
@@ -49,7 +49,7 @@ export const extractTask = (text) => {
   }
 
   if (!taskText && hasVerb) {
-    // fallback: try to capture verb + noun chunk up to 'by'/'at' etc.
+    // fallback to try to capture verb + noun chunk up to 'by'/'at' etc.
     const verbChunk = original.match(/(?:\b(?:finish|fix|complete|deploy|implement|update|write|review|build|investigate|test)\b.+?)(?:\s+by|\s+at|\s+tomorrow|\s+on|$)/i);
     if (verbChunk && verbChunk[0]) taskText = verbChunk[0].trim();
   }

@@ -4,7 +4,7 @@ import Task from '../models/task.model.js';
 import { scheduleReminder } from '../utils/scheduler.js';
 import { sendToTelex } from '../services/telex.service.js';
 
-/**
+/*
  * handleIncomingTelex
  * Expected body: { user: string, message: string }
  */

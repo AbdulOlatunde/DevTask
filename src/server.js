@@ -16,7 +16,7 @@ app.get('/', (req, res) => res.send('DevTask agent is alive'));
 // Webhook endpoint Telex will call
 app.post('/telex/webhook', handleIncomingTelex);
 
-// Admin endpoint to list tasks (for local testing)
+// Admin endpoint to list tasks
 app.get('/admin/tasks', async (req, res) => {
   try {
     const Task = (await import('./models/task.model.js')).default;
