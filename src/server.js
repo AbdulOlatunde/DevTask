@@ -28,7 +28,8 @@ app.get('/admin/tasks', async (req, res) => {
   }
 });
 
-const PORT = process.env.PORT;
+const PORT = process.env.PORT || 7000;
+
 const MONGO_URI = process.env.MONGO_URI;
 
 // Initialize server
