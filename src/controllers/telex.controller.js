@@ -1,53 +1,130 @@
-import { askMastra } from '../mastraAgent.js';
-import { extractTask } from '../utils/parser.js';
-import Task from '../models/task.model.js';
-import { scheduleReminder } from '../utils/scheduler.js';
-import { sendToTelex } from '../services/telex.service.js';
+import { askMastra } from "../mastraAgent.js";
+import { extractTask } from "../utils/parser.js";
+import Task from "../models/task.model.js";
+import { scheduleReminder } from "../utils/scheduler.js";
+import { randomUUID } from "crypto";
 
 /*
  * handleIncomingTelex
- * Expected body: { user: string, message: string }
+ * A2A-compliant webhook for Telex messages
  */
 export const handleIncomingTelex = async (req, res) => {
   try {
-    const payload = req.body || {};
-    const user = payload.user || payload.sender || 'unknown';
-    const message = (payload.message || payload.text || '').toString();
+    const { jsonrpc, id: requestId, method, params } = req.body;
+
+    // Validate JSON-RPC structure
+    if (jsonrpc !== "2.0" || !requestId) {
+      return res.status(400).json({
+        jsonrpc: "2.0",
+        id: requestId || null,
+        error: {
+          code: -32600,
+          message: 'Invalid Request: "jsonrpc" must be "2.0" and "id" is required',
+        },
+      });
+    }
+
+    // Extract message text from A2A format
+    const message =
+      params?.message?.parts?.[0]?.text ||
+      params?.message?.text ||
+      "No message provided";
+
+    const user =
+      params?.message?.sender || params?.sender || "unknown-user";
 
     if (!message || message.trim().length === 0) {
-      return res.status(400).json({ error: 'No message provided' });
+      return res.status(400).json({
+        jsonrpc: "2.0",
+        id: requestId,
+        error: { code: -32602, message: "No message provided" },
+      });
     }
 
-    //let Mastra help with understanding or adding context
+    // Let Mastra reason or add context
     const agentResponse = await askMastra(message);
 
-    // Try to extract a task using parser
+    // Try extracting a task
     const parsed = extractTask(message);
 
+    let replyText;
+
     if (!parsed) {
-      const hint = agentResponse.output || `I didn't spot a task. Try: "I'll fix the bug by 6pm" or "Remind me to deploy tomorrow at 9am".`;
-      // Attempt to reply back to Telex
-      await sendToTelex(user, hint);
-      return res.json({ ok: true, message: hint });
+      replyText =
+        agentResponse.output ||
+        `I didn’t detect a clear task. Try: “Remind me to test API at 6pm.”`;
+    } else {
+      // Persist the new task
+      const newTask = await Task.create({
+        user,
+        task: parsed.task,
+        when: parsed.when,
+        humanTime: parsed.humanTime,
+      });
+
+      // Schedule the reminder
+      scheduleReminder(newTask);
+
+      replyText = `Got it! I’ll remind you to “${newTask.task}” (${parsed.humanTime || new Date(newTask.when).toLocaleString()}).`;
     }
 
-    // Persist task
-    const newTask = await Task.create({
-      user,
-      task: parsed.task,
-      when: parsed.when,
-      humanTime: parsed.humanTime
+    // A2A success response
+    return res.json({
+      jsonrpc: "2.0",
+      id: requestId,
+      result: {
+        id: randomUUID(),
+        contextId: randomUUID(),
+        status: {
+          state: "completed",
+          timestamp: new Date().toISOString(),
+          message: {
+            messageId: randomUUID(),
+            role: "agent",
+            parts: [{ kind: "text", text: replyText }],
+            kind: "message",
+          },
+        },
+        artifacts: [
+          {
+            artifactId: randomUUID(),
+            name: "DevTaskResponse",
+            parts: [{ kind: "text", text: replyText }],
+          },
+        ],
+        history: [
+          {
+            kind: "message",
+            role: "user",
+            parts: params?.message?.parts || [
+              { kind: "text", text: message },
+            ],
+            messageId:
+              params?.message?.messageId || randomUUID(),
+            taskId:
+              params?.message?.taskId || randomUUID(),
+          },
+          {
+            kind: "message",
+            role: "agent",
+            parts: [{ kind: "text", text: replyText }],
+            messageId: randomUUID(),
+            taskId: randomUUID(),
+          },
+        ],
+        kind: "task",
+      },
     });
-
-    // Scheduler reads DB each minute, we just log/schedule
-    scheduleReminder(newTask);
-
-    const confirmation = `Got it. I'll remind you to "${newTask.task}" (${parsed.humanTime || new Date(newTask.when).toLocaleString()}).`;
-    await sendToTelex(user, confirmation);
-
-    return res.json({ ok: true, task: newTask, reply: confirmation });
   } catch (err) {
-    console.error('[telex.controller] Error:', err?.message || err);
-    return res.status(500).json({ error: 'Internal server error' });
+    console.error("[telex.controller] Error:", err.message || err);
+    return res.status(500).json({
+      jsonrpc: "2.0",
+      id: null,
+      error: {
+        code: -32603,
+        message: "Internal error",
+        data: { details: err.message },
+      },
+    });
   }
 };
